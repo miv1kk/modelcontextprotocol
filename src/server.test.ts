@@ -318,6 +318,37 @@ describe("Server Utility Functions", () => {
       expect(apiKey).toBe("pplx-from-custom-header");
     });
 
+    it("should read api key from authInfo extra metadata", () => {
+      const apiKey = getApiKeyFromRequestContext({
+        authInfo: {
+          token: "oauth-access-token",
+          extra: {
+            perplexityApiKey: "pplx-from-oauth-extra",
+          },
+        },
+      });
+
+      expect(apiKey).toBe("pplx-from-oauth-extra");
+    });
+
+    it("should prioritize authInfo extra key over Authorization header", () => {
+      const apiKey = getApiKeyFromRequestContext({
+        requestInfo: {
+          headers: {
+            authorization: "Bearer oauth-access-token",
+          },
+        },
+        authInfo: {
+          token: "oauth-access-token",
+          extra: {
+            perplexityApiKey: "pplx-from-oauth-extra",
+          },
+        },
+      });
+
+      expect(apiKey).toBe("pplx-from-oauth-extra");
+    });
+
     it("should fallback to authInfo token when header is missing", () => {
       const apiKey = getApiKeyFromRequestContext({
         authInfo: {

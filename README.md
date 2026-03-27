@@ -37,28 +37,30 @@ Advanced reasoning and problem-solving using the `sonar-reasoning-pro` model. Pe
 4. (Optional) Set custom base URL: `PERPLEXITY_BASE_URL=https://your-custom-url.com` (default: https://api.perplexity.ai)
 5. (Optional) Set log level: `PERPLEXITY_LOG_LEVEL=DEBUG|INFO|WARN|ERROR` (default: ERROR)
 
-### MCP Authorization (No Env API Key)
+### MCP OAuth Authorization (Inspector)
 
-For Streamable HTTP deployments, you can pass your Perplexity key in MCP authorization instead of environment variables:
+In Streamable HTTP mode, the server supports OAuth and can ask for your Perplexity API key during authorization.
+
+How it works:
+1. Inspector connects to `/mcp` without token and receives OAuth challenge metadata.
+2. Inspector starts OAuth flow (`/authorize`).
+3. You enter your `pplx-...` key on the consent page (`/oauth/consent`).
+4. Server issues OAuth access token.
+5. Tool calls use that token, and the server forwards the stored Perplexity key upstream.
+
+For script-based usage you can still pass your Perplexity key directly as Bearer token:
 
 ```http
 Authorization: Bearer pplx-...
 ```
 
-Inspector-compatible alternatives are also supported:
-
-```http
-Authorization: pplx-...
-X-API-Key: pplx-...
-X-Perplexity-API-Key: pplx-...
-```
-
-The server now resolves API keys in this order:
-1. MCP request `Authorization: Bearer <key>`
-2. MCP request `Authorization: <key>`
-3. MCP request `X-API-Key` / `X-Perplexity-API-Key`
-4. MCP `authInfo.token`
-5. `PERPLEXITY_API_KEY` environment variable (fallback)
+API key resolution order for tool calls:
+1. OAuth token metadata (`authInfo.extra.perplexityApiKey`)
+2. MCP request `Authorization: Bearer <key>`
+3. MCP request `Authorization: <key>`
+4. MCP request `X-API-Key` / `X-Perplexity-API-Key`
+5. MCP `authInfo.token`
+6. `PERPLEXITY_API_KEY` environment variable (fallback)
 
 ### Claude Code
 

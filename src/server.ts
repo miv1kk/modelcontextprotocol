@@ -19,6 +19,9 @@ type IsomorphicHeaders = Record<string, string | string[] | undefined>;
 interface ToolCallContext {
   authInfo?: {
     token?: string;
+    extra?: {
+      perplexityApiKey?: unknown;
+    };
   };
   requestInfo?: {
     headers?: IsomorphicHeaders;
@@ -93,6 +96,11 @@ function extractBearerToken(authorizationHeader: string | undefined): string | u
 }
 
 export function getApiKeyFromRequestContext(context?: ToolCallContext): string | undefined {
+  const keyFromAuthInfoExtra = context?.authInfo?.extra?.perplexityApiKey;
+  if (typeof keyFromAuthInfoExtra === "string" && keyFromAuthInfoExtra.trim()) {
+    return keyFromAuthInfoExtra.trim();
+  }
+
   const headers = context?.requestInfo?.headers;
   const authorizationHeader = getHeaderValue(headers, "authorization");
   const bearerToken = extractBearerToken(authorizationHeader);
