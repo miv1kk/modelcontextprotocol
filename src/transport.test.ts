@@ -81,7 +81,7 @@ describe("Transport Integration Tests", () => {
       app.use(cors({
         origin: "*",
         exposedHeaders: ["Mcp-Session-Id", "mcp-protocol-version"],
-        allowedHeaders: ["Content-Type", "mcp-session-id"],
+        allowedHeaders: ["Content-Type", "mcp-session-id", "Authorization", "authorization"],
       }));
       app.use(express.json());
     });

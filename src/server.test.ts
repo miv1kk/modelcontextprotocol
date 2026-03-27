@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { stripThinkingTokens, getProxyUrl, proxyAwareFetch, validateMessages } from "./server.js";
+import { stripThinkingTokens, getApiKeyFromRequestContext, getProxyUrl, proxyAwareFetch, validateMessages } from "./server.js";
 
 describe("Server Utility Functions", () => {
   describe("stripThinkingTokens", () => {
@@ -251,6 +251,50 @@ describe("Server Utility Functions", () => {
         { role: "assistant", content: "also valid" },
         { role: "user" } // no content
       ], "test_tool")).toThrow("Invalid message at index 2: 'content' must be a string");
+    });
+  });
+
+  describe("getApiKeyFromRequestContext", () => {
+    it("should extract Bearer token from request Authorization header", () => {
+      const apiKey = getApiKeyFromRequestContext({
+        requestInfo: {
+          headers: {
+            authorization: "Bearer pplx-bearer-token",
+          },
+        },
+      });
+
+      expect(apiKey).toBe("pplx-bearer-token");
+    });
+
+    it("should prefer request header over authInfo token", () => {
+      const apiKey = getApiKeyFromRequestContext({
+        requestInfo: {
+          headers: {
+            authorization: "Bearer pplx-from-header",
+          },
+        },
+        authInfo: {
+          token: "pplx-from-auth-info",
+        },
+      });
+
+      expect(apiKey).toBe("pplx-from-header");
+    });
+
+    it("should fallback to authInfo token when header is missing", () => {
+      const apiKey = getApiKeyFromRequestContext({
+        authInfo: {
+          token: "pplx-from-auth-info",
+        },
+      });
+
+      expect(apiKey).toBe("pplx-from-auth-info");
+    });
+
+    it("should return undefined when no auth data is provided", () => {
+      const apiKey = getApiKeyFromRequestContext();
+      expect(apiKey).toBeUndefined();
     });
   });
 });

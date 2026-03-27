@@ -11,9 +11,19 @@ import type {
 } from "./types.js";
 import { ChatCompletionResponseSchema, SearchResponseSchema } from "./validation.js";
 
-const PERPLEXITY_API_KEY = process.env.PERPLEXITY_API_KEY;
 const PERPLEXITY_BASE_URL = process.env.PERPLEXITY_BASE_URL || "https://api.perplexity.ai";
 const VERSION = "0.9.0";
+
+type IsomorphicHeaders = Record<string, string | string[] | undefined>;
+
+interface ToolCallContext {
+  authInfo?: {
+    token?: string;
+  };
+  requestInfo?: {
+    headers?: IsomorphicHeaders;
+  };
+}
 
 export function getProxyUrl(): string | undefined {
   return process.env.PERPLEXITY_PROXY || 
@@ -61,14 +71,57 @@ export function stripThinkingTokens(content: string): string {
   return content.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
 }
 
+function getHeaderValue(headers: IsomorphicHeaders | undefined, name: string): string | undefined {
+  if (!headers) {
+    return undefined;
+  }
+
+  const value = headers[name] ?? headers[name.toLowerCase()] ?? headers[name.toUpperCase()];
+  if (Array.isArray(value)) {
+    return value[0];
+  }
+  return value;
+}
+
+function extractBearerToken(authorizationHeader: string | undefined): string | undefined {
+  if (!authorizationHeader) {
+    return undefined;
+  }
+
+  const match = authorizationHeader.trim().match(/^Bearer\s+(.+)$/i);
+  return match?.[1]?.trim();
+}
+
+export function getApiKeyFromRequestContext(context?: ToolCallContext): string | undefined {
+  const authorizationHeader = getHeaderValue(context?.requestInfo?.headers, "authorization");
+  const bearerToken = extractBearerToken(authorizationHeader);
+
+  if (bearerToken) {
+    return bearerToken;
+  }
+
+  return context?.authInfo?.token;
+}
+
+function resolvePerplexityApiKey(apiKeyFromContext?: string): string {
+  const apiKey = apiKeyFromContext?.trim() || process.env.PERPLEXITY_API_KEY?.trim();
+
+  if (!apiKey) {
+    throw new Error(
+      "Perplexity API key is required. Provide it via MCP Authorization header (Bearer <PERPLEXITY_API_KEY>) or PERPLEXITY_API_KEY environment variable."
+    );
+  }
+
+  return apiKey;
+}
+
 async function makeApiRequest(
   endpoint: string,
   body: Record<string, unknown>,
   serviceOrigin: string | undefined,
+  apiKeyFromContext?: string,
 ): Promise<Response> {
-  if (!PERPLEXITY_API_KEY) {
-    throw new Error("PERPLEXITY_API_KEY environment variable is required");
-  }
+  const apiKey = resolvePerplexityApiKey(apiKeyFromContext);
 
   // Read timeout fresh each time to respect env var changes
   const TIMEOUT_MS = parseInt(process.env.PERPLEXITY_TIMEOUT_MS || "300000", 10);
@@ -81,7 +134,7 @@ async function makeApiRequest(
   try {
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
-      "Authorization": `Bearer ${PERPLEXITY_API_KEY}`,
+      "Authorization": `Bearer ${apiKey}`,
       "User-Agent": `perplexity-mcp/${VERSION}`,
       "X-Source": "pplx-mcp-server",
     };
@@ -194,7 +247,8 @@ export async function performChatCompletion(
   model: string = "sonar-pro",
   stripThinking: boolean = false,
   serviceOrigin?: string,
-  options?: ChatCompletionOptions
+  options?: ChatCompletionOptions,
+  apiKeyFromContext?: string,
 ): Promise<string> {
   const useStreaming = model === "sonar-deep-research";
 
@@ -208,7 +262,7 @@ export async function performChatCompletion(
     ...(options?.reasoning_effort && { reasoning_effort: options.reasoning_effort }),
   };
 
-  const response = await makeApiRequest("chat/completions", body, serviceOrigin);
+  const response = await makeApiRequest("chat/completions", body, serviceOrigin, apiKeyFromContext);
 
   let data: ChatCompletionResponse;
   try {
@@ -276,7 +330,8 @@ export async function performSearch(
   maxResults: number = 10,
   maxTokensPerPage: number = 1024,
   country?: string,
-  serviceOrigin?: string
+  serviceOrigin?: string,
+  apiKeyFromContext?: string,
 ): Promise<string> {
   const body: Record<string, unknown> = {
     query: query,
@@ -285,7 +340,7 @@ export async function performSearch(
     ...(country && { country }),
   };
 
-  const response = await makeApiRequest("search", body, serviceOrigin);
+  const response = await makeApiRequest("search", body, serviceOrigin, apiKeyFromContext);
 
   let data: SearchResponse;
   try {
@@ -380,20 +435,21 @@ export function createPerplexityServer(serviceOrigin?: string) {
         destructiveHint: false,
       },
     },
-    async (args: any) => {
+    async (args: any, context: unknown) => {
       const { messages, search_recency_filter, search_domain_filter, search_context_size } = args as { 
         messages: Message[];
         search_recency_filter?: "hour" | "day" | "week" | "month" | "year";
         search_domain_filter?: string[];
         search_context_size?: "low" | "medium" | "high";
       };
+      const apiKeyFromContext = getApiKeyFromRequestContext(context as ToolCallContext);
       validateMessages(messages, "perplexity_ask");
       const options = {
         ...(search_recency_filter && { search_recency_filter }),
         ...(search_domain_filter && { search_domain_filter }),
         ...(search_context_size && { search_context_size }),
       };
-      const result = await performChatCompletion(messages, "sonar-pro", false, serviceOrigin, Object.keys(options).length > 0 ? options : undefined);
+      const result = await performChatCompletion(messages, "sonar-pro", false, serviceOrigin, Object.keys(options).length > 0 ? options : undefined, apiKeyFromContext);
       return {
         content: [{ type: "text" as const, text: result }],
         structuredContent: { response: result },
@@ -420,18 +476,19 @@ export function createPerplexityServer(serviceOrigin?: string) {
         destructiveHint: false,
       },
     },
-    async (args: any) => {
+    async (args: any, context: unknown) => {
       const { messages, strip_thinking, reasoning_effort } = args as { 
         messages: Message[];
         strip_thinking?: boolean;
         reasoning_effort?: "minimal" | "low" | "medium" | "high";
       };
+      const apiKeyFromContext = getApiKeyFromRequestContext(context as ToolCallContext);
       validateMessages(messages, "perplexity_research");
       const stripThinking = typeof strip_thinking === "boolean" ? strip_thinking : false;
       const options = {
         ...(reasoning_effort && { reasoning_effort }),
       };
-      const result = await performChatCompletion(messages, "sonar-deep-research", stripThinking, serviceOrigin, Object.keys(options).length > 0 ? options : undefined);
+      const result = await performChatCompletion(messages, "sonar-deep-research", stripThinking, serviceOrigin, Object.keys(options).length > 0 ? options : undefined, apiKeyFromContext);
       return {
         content: [{ type: "text" as const, text: result }],
         structuredContent: { response: result },
@@ -458,7 +515,7 @@ export function createPerplexityServer(serviceOrigin?: string) {
         destructiveHint: false,
       },
     },
-    async (args: any) => {
+    async (args: any, context: unknown) => {
       const { messages, strip_thinking, search_recency_filter, search_domain_filter, search_context_size } = args as { 
         messages: Message[];
         strip_thinking?: boolean;
@@ -466,6 +523,7 @@ export function createPerplexityServer(serviceOrigin?: string) {
         search_domain_filter?: string[];
         search_context_size?: "low" | "medium" | "high";
       };
+      const apiKeyFromContext = getApiKeyFromRequestContext(context as ToolCallContext);
       validateMessages(messages, "perplexity_reason");
       const stripThinking = typeof strip_thinking === "boolean" ? strip_thinking : false;
       const options = {
@@ -473,7 +531,7 @@ export function createPerplexityServer(serviceOrigin?: string) {
         ...(search_domain_filter && { search_domain_filter }),
         ...(search_context_size && { search_context_size }),
       };
-      const result = await performChatCompletion(messages, "sonar-reasoning-pro", stripThinking, serviceOrigin, Object.keys(options).length > 0 ? options : undefined);
+      const result = await performChatCompletion(messages, "sonar-reasoning-pro", stripThinking, serviceOrigin, Object.keys(options).length > 0 ? options : undefined, apiKeyFromContext);
       return {
         content: [{ type: "text" as const, text: result }],
         structuredContent: { response: result },
@@ -512,18 +570,19 @@ export function createPerplexityServer(serviceOrigin?: string) {
         destructiveHint: false,
       },
     },
-    async (args: any) => {
+    async (args: any, context: unknown) => {
       const { query, max_results, max_tokens_per_page, country } = args as {
         query: string;
         max_results?: number;
         max_tokens_per_page?: number;
         country?: string;
       };
+      const apiKeyFromContext = getApiKeyFromRequestContext(context as ToolCallContext);
       const maxResults = typeof max_results === "number" ? max_results : 10;
       const maxTokensPerPage = typeof max_tokens_per_page === "number" ? max_tokens_per_page : 1024;
       const countryCode = typeof country === "string" ? country : undefined;
       
-      const result = await performSearch(query, maxResults, maxTokensPerPage, countryCode, serviceOrigin);
+      const result = await performSearch(query, maxResults, maxTokensPerPage, countryCode, serviceOrigin, apiKeyFromContext);
       return {
         content: [{ type: "text" as const, text: result }],
         structuredContent: { results: result },

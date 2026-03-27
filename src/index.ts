@@ -3,12 +3,6 @@
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { createPerplexityServer } from "./server.js";
 
-const PERPLEXITY_API_KEY = process.env.PERPLEXITY_API_KEY;
-if (!PERPLEXITY_API_KEY) {
-  console.error("Error: PERPLEXITY_API_KEY environment variable is required");
-  process.exit(1);
-}
-
 async function main() {
   try {
     const server = createPerplexityServer("local-mcp");

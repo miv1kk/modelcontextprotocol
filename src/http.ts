@@ -6,12 +6,6 @@ import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/
 import { createPerplexityServer } from "./server.js";
 import { logger } from "./logger.js";
 
-const PERPLEXITY_API_KEY = process.env.PERPLEXITY_API_KEY;
-if (!PERPLEXITY_API_KEY) {
-  logger.error("PERPLEXITY_API_KEY environment variable is required");
-  process.exit(1);
-}
-
 const app = express();
 const PORT = parseInt(process.env.PORT || "8080", 10);
 const BIND_ADDRESS = process.env.BIND_ADDRESS || "0.0.0.0";
@@ -33,15 +27,14 @@ app.use(cors({
     }
   },
   exposedHeaders: ["Mcp-Session-Id", "mcp-protocol-version"],
-  allowedHeaders: ["Content-Type", "mcp-session-id"],
+  allowedHeaders: ["Content-Type", "mcp-session-id", "Authorization", "authorization"],
 }));
 
 app.use(express.json());
 
-const mcpServer = createPerplexityServer();
-
 app.all("/mcp", async (req, res) => {
   try {
+    const mcpServer = createPerplexityServer();
     const transport = new StreamableHTTPServerTransport({
       sessionIdGenerator: undefined,
       enableJsonResponse: true,

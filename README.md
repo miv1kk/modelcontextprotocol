@@ -37,6 +37,19 @@ Advanced reasoning and problem-solving using the `sonar-reasoning-pro` model. Pe
 4. (Optional) Set custom base URL: `PERPLEXITY_BASE_URL=https://your-custom-url.com` (default: https://api.perplexity.ai)
 5. (Optional) Set log level: `PERPLEXITY_LOG_LEVEL=DEBUG|INFO|WARN|ERROR` (default: ERROR)
 
+### MCP Authorization (No Env API Key)
+
+For Streamable HTTP deployments, you can pass your Perplexity key in MCP authorization instead of environment variables:
+
+```http
+Authorization: Bearer pplx-...
+```
+
+The server now resolves API keys in this order:
+1. MCP request `Authorization: Bearer <key>`
+2. MCP `authInfo.token`
+3. `PERPLEXITY_API_KEY` environment variable (fallback)
+
 ### Claude Code
 
 ```bash
