@@ -282,6 +282,42 @@ describe("Server Utility Functions", () => {
       expect(apiKey).toBe("pplx-from-header");
     });
 
+    it("should accept raw authorization token without Bearer prefix", () => {
+      const apiKey = getApiKeyFromRequestContext({
+        requestInfo: {
+          headers: {
+            authorization: "pplx-raw-token",
+          },
+        },
+      });
+
+      expect(apiKey).toBe("pplx-raw-token");
+    });
+
+    it("should accept x-api-key header", () => {
+      const apiKey = getApiKeyFromRequestContext({
+        requestInfo: {
+          headers: {
+            "x-api-key": "pplx-from-x-api-key",
+          },
+        },
+      });
+
+      expect(apiKey).toBe("pplx-from-x-api-key");
+    });
+
+    it("should accept x-perplexity-api-key header", () => {
+      const apiKey = getApiKeyFromRequestContext({
+        requestInfo: {
+          headers: {
+            "x-perplexity-api-key": "pplx-from-custom-header",
+          },
+        },
+      });
+
+      expect(apiKey).toBe("pplx-from-custom-header");
+    });
+
     it("should fallback to authInfo token when header is missing", () => {
       const apiKey = getApiKeyFromRequestContext({
         authInfo: {

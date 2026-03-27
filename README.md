@@ -45,10 +45,20 @@ For Streamable HTTP deployments, you can pass your Perplexity key in MCP authori
 Authorization: Bearer pplx-...
 ```
 
+Inspector-compatible alternatives are also supported:
+
+```http
+Authorization: pplx-...
+X-API-Key: pplx-...
+X-Perplexity-API-Key: pplx-...
+```
+
 The server now resolves API keys in this order:
 1. MCP request `Authorization: Bearer <key>`
-2. MCP `authInfo.token`
-3. `PERPLEXITY_API_KEY` environment variable (fallback)
+2. MCP request `Authorization: <key>`
+3. MCP request `X-API-Key` / `X-Perplexity-API-Key`
+4. MCP `authInfo.token`
+5. `PERPLEXITY_API_KEY` environment variable (fallback)
 
 ### Claude Code
 

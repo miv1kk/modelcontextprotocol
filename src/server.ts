@@ -93,11 +93,22 @@ function extractBearerToken(authorizationHeader: string | undefined): string | u
 }
 
 export function getApiKeyFromRequestContext(context?: ToolCallContext): string | undefined {
-  const authorizationHeader = getHeaderValue(context?.requestInfo?.headers, "authorization");
+  const headers = context?.requestInfo?.headers;
+  const authorizationHeader = getHeaderValue(headers, "authorization");
   const bearerToken = extractBearerToken(authorizationHeader);
 
   if (bearerToken) {
     return bearerToken;
+  }
+
+  // Inspector and other MCP clients may send raw token without Bearer prefix.
+  if (authorizationHeader && authorizationHeader.trim()) {
+    return authorizationHeader.trim();
+  }
+
+  const apiKeyHeader = getHeaderValue(headers, "x-api-key") || getHeaderValue(headers, "x-perplexity-api-key");
+  if (apiKeyHeader && apiKeyHeader.trim()) {
+    return apiKeyHeader.trim();
   }
 
   return context?.authInfo?.token;

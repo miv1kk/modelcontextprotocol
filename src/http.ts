@@ -27,7 +27,16 @@ app.use(cors({
     }
   },
   exposedHeaders: ["Mcp-Session-Id", "mcp-protocol-version"],
-  allowedHeaders: ["Content-Type", "mcp-session-id", "Authorization", "authorization"],
+  allowedHeaders: [
+    "Content-Type",
+    "mcp-session-id",
+    "Authorization",
+    "authorization",
+    "X-API-Key",
+    "x-api-key",
+    "X-Perplexity-API-Key",
+    "x-perplexity-api-key",
+  ],
 }));
 
 app.use(express.json());
