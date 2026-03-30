@@ -319,8 +319,6 @@ app.get("/oauth/consent", (req, res) => {
   }
 
   const safeRequestId = escapeHtml(requestId);
-  const safeRedirect = escapeHtml(pending.params.redirectUri);
-  const safeClientId = escapeHtml(pending.clientId);
 
   res.status(200).type("html").send(`<!doctype html>
 <html lang="en">
@@ -329,23 +327,220 @@ app.get("/oauth/consent", (req, res) => {
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Authorize Perplexity MCP</title>
     <style>
-      body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; margin: 2rem; max-width: 680px; }
-      input { width: 100%; padding: 0.6rem; margin: 0.5rem 0 1rem; font-size: 1rem; }
-      button { padding: 0.6rem 1rem; font-size: 1rem; }
-      .meta { color: #444; font-size: 0.95rem; }
+      :root {
+        color-scheme: dark;
+        --bg: #060606;
+        --line: rgba(255, 255, 255, 0.22);
+        --line-strong: rgba(255, 255, 255, 0.98);
+        --neon: rgba(255, 255, 255, 0.96);
+        --text: #f5f5f5;
+        --text-soft: #bdbdbd;
+      }
+
+      * { box-sizing: border-box; }
+
+      html, body {
+        width: 100%;
+        height: 100%;
+        margin: 0;
+        font-family: "Segoe UI", "SF Pro Text", -apple-system, BlinkMacSystemFont, sans-serif;
+        background:
+          radial-gradient(1100px 460px at 50% -18%, rgba(255, 255, 255, 0.11), transparent 62%),
+          radial-gradient(760px 420px at 8% 100%, rgba(255, 255, 255, 0.05), transparent 66%),
+          var(--bg);
+        color: var(--text);
+        overflow: hidden;
+      }
+
+      body::before {
+        content: "";
+        position: fixed;
+        inset: -20%;
+        pointer-events: none;
+        background: radial-gradient(closest-side, rgba(255, 255, 255, 0.04), transparent 72%);
+      }
+
+      .screen {
+        min-height: 100%;
+        display: grid;
+        place-items: center;
+        padding: 26px;
+      }
+
+      .card {
+        position: relative;
+        width: min(560px, 100%);
+        background: linear-gradient(180deg, rgba(20, 20, 20, 0.94), rgba(8, 8, 8, 0.92));
+        border: 1px solid var(--line);
+        border-radius: 26px;
+        padding: 30px 24px 22px;
+        box-shadow:
+          0 0 0 1px rgba(255, 255, 255, 0.1),
+          0 18px 60px rgba(0, 0, 0, 0.62),
+          0 0 30px rgba(255, 255, 255, 0.12);
+        overflow: hidden;
+      }
+
+      .card::before {
+        content: "";
+        position: absolute;
+        inset: 1px;
+        pointer-events: none;
+        border-radius: 24px;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+      }
+
+      .card::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        padding: 1.5px;
+        pointer-events: none;
+        border-radius: 26px;
+        background:
+          linear-gradient(120deg,
+            rgba(255, 255, 255, 0.95) 0%,
+            rgba(255, 255, 255, 0.48) 24%,
+            rgba(255, 255, 255, 0.78) 49%,
+            rgba(255, 255, 255, 0.48) 74%,
+            rgba(255, 255, 255, 0.94) 100%);
+        -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+        -webkit-mask-composite: xor;
+        mask-composite: exclude;
+        filter: drop-shadow(0 0 6px var(--neon)) drop-shadow(0 0 18px rgba(255, 255, 255, 0.28));
+        opacity: 0.96;
+      }
+
+      h1 {
+        margin: 0;
+        font-size: clamp(1.35rem, 3vw, 1.85rem);
+        letter-spacing: 0.03em;
+      }
+
+      .subtitle {
+        margin: 10px 0 18px;
+        color: var(--text-soft);
+        font-size: 0.98rem;
+      }
+
+      .field-label {
+        display: block;
+        margin: 0 0 8px;
+        font-size: 0.9rem;
+      }
+
+      .input-wrap {
+        display: flex;
+        gap: 8px;
+      }
+
+      .input-wrap input {
+        flex: 1;
+        min-width: 0;
+      }
+
+      input {
+        width: 100%;
+        border: 1px solid rgba(255, 255, 255, 0.28);
+        border-radius: 12px;
+        background: rgba(0, 0, 0, 0.66);
+        color: #fff;
+        padding: 0.76rem 0.84rem;
+        font-size: 0.96rem;
+        outline: none;
+        transition: border-color 220ms ease, box-shadow 220ms ease, background-color 220ms ease;
+      }
+
+      input:focus {
+        border-color: #fff;
+        background: rgba(0, 0, 0, 0.78);
+        box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.26), 0 0 18px rgba(255, 255, 255, 0.3);
+      }
+
+      .ghost {
+        border: 1px solid rgba(255, 255, 255, 0.28);
+        border-radius: 12px;
+        background: rgba(255, 255, 255, 0.02);
+        color: #eaeaea;
+        padding: 0 12px;
+        cursor: pointer;
+        font-size: 0.86rem;
+        transition: border-color 180ms ease, box-shadow 180ms ease, background-color 180ms ease;
+      }
+
+      .ghost:hover {
+        border-color: rgba(255, 255, 255, 0.95);
+        background: rgba(255, 255, 255, 0.06);
+        box-shadow: 0 0 12px rgba(255, 255, 255, 0.24);
+      }
+
+      .submit {
+        width: 100%;
+        margin-top: 12px;
+        border: 1px solid #fff;
+        border-radius: 12px;
+        background: linear-gradient(180deg, #ffffff 0%, #ececec 100%);
+        color: #050505;
+        font-weight: 600;
+        font-size: 0.96rem;
+        padding: 0.78rem 0.95rem;
+        cursor: pointer;
+        transition: transform 160ms ease, box-shadow 220ms ease, opacity 220ms ease, filter 220ms ease;
+      }
+
+      .submit:hover {
+        filter: brightness(1.06);
+        box-shadow: 0 0 20px rgba(255, 255, 255, 0.64), 0 0 34px rgba(255, 255, 255, 0.34);
+      }
+
+      .submit:active {
+        transform: translateY(1px);
+      }
+
+      .hint {
+        margin: 10px 0 0;
+        color: #999;
+        font-size: 0.82rem;
+      }
+
+      @media (max-width: 640px) {
+        .screen { padding: 14px; }
+        .card { padding: 22px 16px 16px; }
+      }
     </style>
   </head>
   <body>
-    <h1>Authorize Perplexity MCP</h1>
-    <p class="meta">Client: <strong>${safeClientId}</strong></p>
-    <p class="meta">Redirect URI: <strong>${safeRedirect}</strong></p>
-    <p>Enter your Perplexity API key to complete OAuth authorization.</p>
-    <form method="post" action="/oauth/consent">
-      <input type="hidden" name="request_id" value="${safeRequestId}" />
-      <label for="api_key">Perplexity API key</label>
-      <input id="api_key" name="api_key" placeholder="pplx-..." autocomplete="off" required />
-      <button type="submit">Authorize</button>
-    </form>
+    <main class="screen">
+      <section class="card">
+        <h1>Authorize Perplexity MCP</h1>
+        <p class="subtitle">Enter your API key to finish OAuth authorization.</p>
+
+        <form method="post" action="/oauth/consent">
+          <input type="hidden" name="request_id" value="${safeRequestId}" />
+          <label class="field-label" for="api_key">Perplexity API key</label>
+          <div class="input-wrap">
+            <input id="api_key" name="api_key" type="password" placeholder="pplx-..." autocomplete="off" required />
+            <button class="ghost" type="button" id="toggle-key" aria-label="Show key">Show</button>
+          </div>
+          <button class="submit" type="submit">Continue</button>
+          <p class="hint">Your key is attached to the OAuth token metadata for this MCP session.</p>
+        </form>
+      </section>
+    </main>
+
+    <script>
+      (function () {
+        var input = document.getElementById("api_key");
+        var toggle = document.getElementById("toggle-key");
+        if (!input || !toggle) return;
+
+        toggle.addEventListener("click", function () {
+          var isHidden = input.getAttribute("type") === "password";
+          input.setAttribute("type", isHidden ? "text" : "password");
+          toggle.textContent = isHidden ? "Hide" : "Show";
+        });
+      })();
+    </script>
   </body>
 </html>`);
 });
