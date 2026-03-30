@@ -15,6 +15,48 @@ Build the Docker image from the project root:
 docker build -t perplexity-mcp-server .
 ```
 
+## Docker Compose (Recommended)
+
+This repository includes a ready-to-run Compose setup:
+
+- `docker-compose.yml`
+- `.env.compose.example`
+
+### 1. Prepare environment file
+
+```bash
+cp .env.compose.example .env.compose
+```
+
+Edit `.env.compose` for your deployment.
+
+For your case (MCP client on `numira.ai`, server on `192.168.0.34:8080`), make sure:
+
+- `ALLOWED_ORIGINS=https://numira.ai`
+- `OAUTH_PUBLIC_BASE_URL` points to the URL your MCP client can reach
+- `OAUTH_ISSUER_URL` and `OAUTH_RESOURCE_SERVER_URL` match that same reachable URL
+
+> If you use `http://` for issuer URLs (LAN/dev), keep `MCP_DANGEROUSLY_ALLOW_INSECURE_ISSUER_URL=1`.
+> For production, use HTTPS and remove this flag.
+
+### 2. Start services
+
+```bash
+docker compose up -d --build
+```
+
+### 3. Check health
+
+```bash
+curl -i http://127.0.0.1:8080/health
+```
+
+### 4. Stop services
+
+```bash
+docker compose down
+```
+
 ## Running the Container
 
 ### HTTP Mode (Default)
@@ -100,4 +142,3 @@ PERPLEXITY_API_KEY=your_key_here npm start
 ```
 
 > **Note**: The Docker image is optimized for HTTP mode deployment. For local STDIO usage, the `npx` method documented in the main README is recommended.
-

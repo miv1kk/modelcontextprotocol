@@ -1,0 +1,22 @@
+services:
+  perplexity-mcp:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: perplexity-mcp:local
+    container_name: perplexity-mcp
+    restart: unless-stopped
+    ports:
+      - "8081:8081"
+    env_file:
+      - .env.compose
+    environment:
+      PORT: "8081"
+      BIND_ADDRESS: "0.0.0.0"
+      NODE_ENV: "production"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8081/health >/dev/null 2>&1 || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 15s
